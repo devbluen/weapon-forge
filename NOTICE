@@ -1,0 +1,20 @@
+weapon-forge
+============
+
+This project is a C++ port of weapon-config by Oscar Broman and contributors
+(https://github.com/oscar-broman/samp-weapon-config), licensed under the
+Apache License 2.0 (see third_party/weapon-config-LICENSE).
+
+The damage validation rules, default weapon values, vending machine data and
+the overall damage/death behaviour are derived from weapon-config. The logic
+was rewritten in C++ as a SA-MP plugin / open.mp component, the sync packet
+processing was moved out of Pawn, and new features were added (see README.md).
+
+The SA-MP RakServer method indices and the RakNet Packet layout used in
+src/net_samp.cpp follow Pawn.RakNet by katursis
+(https://github.com/katursis/Pawn.RakNet), MIT License
+(see third_party/Pawn.RakNet-LICENSE).
+
+The open.mp SDK (https://github.com/openmultiplayer/open.mp-sdk, Mozilla
+Public License 2.0) is downloaded at build time and used for the open.mp
+component entry point.

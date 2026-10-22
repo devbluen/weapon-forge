@@ -1,0 +1,49 @@
+name: Wiki
+
+# Publishes wiki/ to the repository's GitHub wiki. Manual only.
+# One-time setup: enable the wiki and create any first page in the web UI.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: wiki
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish wiki
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Push pages to the wiki repository
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          wiki_url="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.wiki.git"
+
+          if ! git clone --quiet "$wiki_url" wiki-repo; then
+            echo "::error::Wiki repository not found. Enable the wiki and create its first page in the web UI, then run this workflow again."
+            exit 1
+          fi
+
+          # Replace the content with wiki/ (keeping the wiki's git history)
+          find wiki-repo -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
+          rsync -a --exclude README.md wiki/ wiki-repo/
+
+          cd wiki-repo
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+
+          if git diff --cached --quiet; then
+            echo "Wiki already up to date."
+            exit 0
+          fi
+
+          git commit --quiet -m "Update wiki from ${GITHUB_SHA::7}"
+          git push --quiet origin HEAD
+          echo "Wiki updated."

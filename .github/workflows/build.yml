@@ -1,0 +1,225 @@
+name: Build
+
+# Runs on pull requests and when started manually in the Actions tab.
+# A manual run can also publish a GitHub release with the binaries.
+on:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      release:
+        description: Create a GitHub release with the binaries
+        type: boolean
+        default: false
+      version:
+        description: Release version (e.g. 1.2.0). Empty = contents of the VERSION file
+        type: string
+        required: false
+      prerelease:
+        description: Mark the release as a pre-release
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PAWNCC_VERSION: 3.10.10
+
+jobs:
+  version:
+    name: Version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve version
+        id: version
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          version="${INPUT_VERSION:-$(head -n1 VERSION)}"
+          version="$(echo "$version" | tr -d '[:space:]')"
+          version="${version#v}"
+          if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::Invalid version: '$version' (use MAJOR.MINOR.PATCH)"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Version: $version"
+
+  windows:
+    name: Windows (x86)
+    needs: version
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache open.mp SDK and Zig
+        uses: actions/cache@v4
+        with:
+          path: |
+            build/deps
+            build/tools
+          key: deps-${{ runner.os }}-${{ hashFiles('CMakeLists.txt', 'build.ps1') }}
+
+      - name: Build
+        shell: pwsh
+        run: ./build.ps1 -Platform Windows -Version '${{ needs.version.outputs.version }}' -Package
+
+      - name: Check exports
+        shell: pwsh
+        run: |
+          $vs = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath
+          $dumpbin = Get-ChildItem "$vs\VC\Tools\MSVC" -Recurse -Filter dumpbin.exe | Where-Object FullName -like '*Hostx64\x86*' | Select-Object -First 1
+          $exports = & $dumpbin.FullName /exports dist\plugins\weapon-forge.dll | Out-String
+          foreach ($name in 'Supports', 'Load', 'Unload', 'AmxLoad', 'AmxUnload', 'ProcessTick', 'ComponentEntryPoint') {
+            if ($exports -notmatch "\s$name\r?\n") { throw "Missing export: $name" }
+          }
+          Write-Host 'All plugin exports present'
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: weapon-forge-windows
+          path: dist/weapon-forge-*-windows.zip
+          if-no-files-found: error
+
+  linux:
+    name: Linux (x86)
+    needs: version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Same script as on Windows: cross-compiled with Zig for glibc 2.17+
+      # (tools/elfcheck.py validates the exports and the glibc requirement)
+      - name: Cache open.mp SDK and Zig
+        uses: actions/cache@v4
+        with:
+          path: |
+            build/deps
+            build/tools
+          key: deps-${{ runner.os }}-${{ hashFiles('CMakeLists.txt', 'build.ps1') }}
+
+      - name: Build
+        shell: pwsh
+        run: ./build.ps1 -Platform Linux -Version '${{ needs.version.outputs.version }}' -Package
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: weapon-forge-linux
+          path: dist/weapon-forge-*-linux.tar.gz
+          if-no-files-found: error
+
+  pawn:
+    name: Include (SA-MP / open.mp)
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download compiler and standard libraries
+        shell: pwsh
+        run: |
+          $deps = Join-Path $env:RUNNER_TEMP 'deps'
+          New-Item -ItemType Directory -Force $deps | Out-Null
+          $downloads = @{
+            'pawnc'       = "https://github.com/pawn-lang/compiler/releases/download/v$env:PAWNCC_VERSION/pawnc-$env:PAWNCC_VERSION-windows.zip"
+            'samp-stdlib' = 'https://github.com/pawn-lang/samp-stdlib/archive/refs/heads/master.zip'
+            'pawn-stdlib' = 'https://github.com/pawn-lang/pawn-stdlib/archive/refs/heads/master.zip'
+            'omp-stdlib'  = 'https://github.com/openmultiplayer/omp-stdlib/archive/refs/heads/master.zip'
+          }
+          foreach ($name in $downloads.Keys) {
+            Invoke-WebRequest $downloads[$name] -OutFile "$deps\$name.zip"
+            Expand-Archive "$deps\$name.zip" -DestinationPath "$deps\$name" -Force
+          }
+          "DEPS=$deps" >> $env:GITHUB_ENV
+
+      - name: Compile tests
+        shell: pwsh
+        run: |
+          $pawncc = Get-ChildItem "$env:DEPS\pawnc" -Recurse -Filter pawncc.exe | Select-Object -First 1
+          $samp = @("-i$env:DEPS\samp-stdlib\samp-stdlib-master", "-i$env:DEPS\pawn-stdlib\pawn-stdlib-master")
+          $omp = @("-i$env:DEPS\omp-stdlib\omp-stdlib-master", 'TEST_OPEN_MP=1', '-Z+')
+          $cases = @(
+            @{ Name = 'gamemode / SA-MP';               File = 'gamemode';     Args = $samp },
+            @{ Name = 'gamemode / open.mp';             File = 'gamemode';     Args = $omp },
+            @{ Name = 'filterscript / SA-MP';           File = 'filterscript'; Args = $samp },
+            @{ Name = 'filterscript / open.mp';         File = 'filterscript'; Args = $omp },
+            @{ Name = 'runtime / SA-MP';                File = 'runtime';      Args = $samp },
+            @{ Name = 'runtime / open.mp';              File = 'runtime';      Args = $omp }
+          )
+          $failed = $false
+          New-Item -ItemType Directory -Force out | Out-Null
+          foreach ($case in $cases) {
+            Write-Host "::group::$($case.Name)"
+            $output = & $pawncc.FullName "tests\$($case.File).pwn" "-oout\$($case.File)" '-iinclude' '-d3' '-;+' '-(+' @($case.Args) 2>&1 | Out-String
+            Write-Host $output
+            Write-Host '::endgroup::'
+            # Any warning fails the build (the include is declarations only)
+            if ($LASTEXITCODE -ne 0 -or $output -match ' : (warning|error) ') {
+              Write-Host "::error::$($case.Name) failed"
+              $failed = $true
+            }
+          }
+          if ($failed) { exit 1 }
+
+  release:
+    name: GitHub release
+    if: github.event_name == 'workflow_dispatch' && inputs.release
+    needs: [version, windows, linux, pawn]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.version.outputs.version }}
+          PRERELEASE: ${{ inputs.prerelease }}
+        run: |
+          tag="v$VERSION"
+
+          if gh release view "$tag" > /dev/null 2>&1; then
+            echo "::error::Release $tag already exists. Use another version."
+            exit 1
+          fi
+
+          cp include/weapon-forge.inc artifacts/
+
+          cat > notes.md <<EOF
+          ## Installation
+
+          The same binary works on both servers:
+
+          | Server | Windows (\`weapon-forge-$VERSION-windows.zip\`) | Linux (\`weapon-forge-$VERSION-linux.tar.gz\`) |
+          |---|---|---|
+          | SA-MP | \`plugins/weapon-forge.dll\` + \`plugins weapon-forge.dll\` in \`server.cfg\` | \`plugins/weapon-forge.so\` + \`plugins weapon-forge.so\` |
+          | open.mp | \`components/weapon-forge.dll\` (loaded automatically) | \`components/weapon-forge.so\` |
+
+          Copy \`weapon-forge.inc\` to your include folder and include it after \`<a_samp>\`/\`<open.mp>\` (declarations only, optional).
+
+          EOF
+
+          flags=()
+          if [ "$PRERELEASE" = "true" ]; then
+            flags+=(--prerelease)
+          fi
+
+          gh release create "$tag" artifacts/* \
+            --target "$GITHUB_SHA" \
+            --title "weapon-forge $tag" \
+            --notes-file notes.md \
+            --generate-notes \
+            "${flags[@]}"
