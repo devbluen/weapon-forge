@@ -287,7 +287,7 @@ O workflow `.github/workflows/build.yml` roda **apenas** em pull requests e quan
 
 - compila Windows e Linux com o `build.ps1` e confere os binários (exports, formato ELF, versão da glibc);
 - compila os scripts de teste contra os includes do SA-MP e do open.mp (qualquer warning falha o build);
-- publica os binários como artifacts.
+- publica os binários como artifacts (o download já traz `plugins/`, `components/` e `include/`, sem zip dentro).
 
 Para criar uma release: **Actions → Build → Run workflow**, marque **"Create a GitHub release with the binaries"** e informe a versão (vazio = arquivo `VERSION`). O workflow cria a tag `vX.Y.Z` e anexa `weapon-forge-X.Y.Z-windows.zip`, `weapon-forge-X.Y.Z-linux.tar.gz` e `weapon-forge.inc`.
 

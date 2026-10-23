@@ -83,10 +83,12 @@ jobs:
           }
           Write-Host 'All plugin exports present'
 
+      # Uploaded as a folder: GitHub zips artifacts itself, so the download
+      # contains plugins/, components/ and include/ directly
       - uses: actions/upload-artifact@v4
         with:
-          name: weapon-forge-windows
-          path: dist/weapon-forge-*-windows.zip
+          name: weapon-forge-${{ needs.version.outputs.version }}-windows
+          path: build/package-windows/
           if-no-files-found: error
 
   linux:
@@ -112,8 +114,8 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: weapon-forge-linux
-          path: dist/weapon-forge-*-linux.tar.gz
+          name: weapon-forge-${{ needs.version.outputs.version }}-linux
+          path: build/package-linux/
           if-no-files-found: error
 
   pawn:
@@ -162,6 +164,12 @@ jobs:
             Write-Host '::endgroup::'
             # Any warning fails the build (the include is declarations only)
             if ($LASTEXITCODE -ne 0 -or $output -match ' : (warning|error) ') {
+              foreach ($line in $output -split "`r?`n") {
+                if ($line -match '^(.+?)\((\d+)\) : ((?:warning|error|fatal error) \d+: .*)$') {
+                  $file = $Matches[1] -replace '\\', '/'
+                  Write-Host "::error file=$file,line=$($Matches[2]),title=$($case.Name)::$($Matches[3])"
+                }
+              }
               Write-Host "::error::$($case.Name) failed"
               $failed = $true
             }
@@ -180,8 +188,7 @@ jobs:
 
       - uses: actions/download-artifact@v4
         with:
-          path: artifacts
-          merge-multiple: true
+          path: packages
 
       - name: Create release
         env:
@@ -196,7 +203,12 @@ jobs:
             exit 1
           fi
 
+          # The artifacts are folders; the release gets one archive per OS
+          mkdir -p artifacts
+          (cd "packages/weapon-forge-$VERSION-windows" && zip -qr "$GITHUB_WORKSPACE/artifacts/weapon-forge-$VERSION-windows.zip" .)
+          tar -czf "artifacts/weapon-forge-$VERSION-linux.tar.gz" -C "packages/weapon-forge-$VERSION-linux" plugins components include
           cp include/weapon-forge.inc artifacts/
+          ls -l artifacts
 
           cat > notes.md <<EOF
           ## Installation

@@ -25,9 +25,48 @@
 	#include <a_samp>
 #endif
 
-// Tag used by open.mp, mapped to untagged in SA-MP
-#if !defined _INC_open_mp && !defined WEAPON
-	#define WEAPON: _:
+// Tags used by open.mp, mapped to untagged in SA-MP, so code written with
+// open.mp tags (as weapon-config users do) also compiles with a_samp
+#if !defined _INC_open_mp
+	#if !defined BULLET_HIT_TYPE
+		#define BULLET_HIT_TYPE: _:
+	#endif
+
+	#if !defined FORCE_SYNC
+		#define FORCE_SYNC: _:
+	#endif
+
+	#if !defined KEY
+		#define KEY: _:
+	#endif
+
+	#if !defined PLAYER_STATE
+		#define PLAYER_STATE: _:
+	#endif
+
+	#if !defined SPECIAL_ACTION
+		#define SPECIAL_ACTION: _:
+	#endif
+
+	#if !defined SPECTATE_MODE
+		#define SPECTATE_MODE: _:
+	#endif
+
+	#if !defined TEXT_DRAW_ALIGN
+		#define TEXT_DRAW_ALIGN: _:
+	#endif
+
+	#if !defined TEXT_DRAW_FONT
+		#define TEXT_DRAW_FONT: _:
+	#endif
+
+	#if !defined WEAPON
+		#define WEAPON: _:
+	#endif
+
+	#if !defined WEAPON_SLOT
+		#define WEAPON_SLOT: _:
+	#endif
 #endif
 
 /*

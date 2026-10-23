@@ -14,7 +14,7 @@ Runs on **pull requests** and when started manually (**Actions → Build → Run
 | Include (SA-MP / open.mp) | Compiles `tests/*.pwn` with pawncc 3.10.10 against the SA-MP and the open.mp standard libraries. Any warning fails |
 | GitHub release | Only when requested (see below) |
 
-The open.mp SDK and Zig are cached between runs. The packages are uploaded as artifacts (`weapon-forge-windows`, `weapon-forge-linux`) on every run.
+The open.mp SDK and Zig are cached between runs. Every run uploads two artifacts, `weapon-forge-X.Y.Z-windows` and `weapon-forge-X.Y.Z-linux`. Their download contains `plugins/`, `components/` and `include/` directly, with no archive inside. The `.zip` / `.tar.gz` archives are only created for releases.
 
 ### Publishing a release
 
