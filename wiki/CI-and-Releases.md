@@ -11,7 +11,6 @@ Runs on **pull requests** and when started manually (**Actions → Build → Run
 | Version | Resolves the version: the workflow input, or the `VERSION` file |
 | Windows (x86) | `build.ps1 -Platform Windows -Package`, then checks the DLL exports with `dumpbin` |
 | Linux (x86) | `build.ps1 -Platform Linux -Package` on Ubuntu (Zig cross-compiler), checked by `tools/elfcheck.py` |
-| Include (SA-MP / open.mp) | Compiles `tests/*.pwn` with pawncc 3.10.10 against the SA-MP and the open.mp standard libraries. Any warning fails |
 | GitHub release | Only when requested (see below) |
 
 The open.mp SDK and Zig are cached between runs. Every run uploads two artifacts, `weapon-forge-X.Y.Z-windows` and `weapon-forge-X.Y.Z-linux`. Their download contains `plugins/`, `components/` and `include/` directly, with no archive inside. The `.zip` / `.tar.gz` archives are only created for releases.

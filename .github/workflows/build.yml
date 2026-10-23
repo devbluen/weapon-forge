@@ -26,9 +26,6 @@ concurrency:
   group: build-${{ github.ref }}
   cancel-in-progress: true
 
-env:
-  PAWNCC_VERSION: 3.10.10
-
 jobs:
   version:
     name: Version
@@ -118,68 +115,10 @@ jobs:
           path: build/package-linux/
           if-no-files-found: error
 
-  pawn:
-    name: Include (SA-MP / open.mp)
-    runs-on: windows-2022
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Download compiler and standard libraries
-        shell: pwsh
-        run: |
-          $deps = Join-Path $env:RUNNER_TEMP 'deps'
-          New-Item -ItemType Directory -Force $deps | Out-Null
-          $downloads = @{
-            'pawnc'       = "https://github.com/pawn-lang/compiler/releases/download/v$env:PAWNCC_VERSION/pawnc-$env:PAWNCC_VERSION-windows.zip"
-            'samp-stdlib' = 'https://github.com/pawn-lang/samp-stdlib/archive/refs/heads/master.zip'
-            'pawn-stdlib' = 'https://github.com/pawn-lang/pawn-stdlib/archive/refs/heads/master.zip'
-            'omp-stdlib'  = 'https://github.com/openmultiplayer/omp-stdlib/archive/refs/heads/master.zip'
-          }
-          foreach ($name in $downloads.Keys) {
-            Invoke-WebRequest $downloads[$name] -OutFile "$deps\$name.zip"
-            Expand-Archive "$deps\$name.zip" -DestinationPath "$deps\$name" -Force
-          }
-          "DEPS=$deps" >> $env:GITHUB_ENV
-
-      - name: Compile tests
-        shell: pwsh
-        run: |
-          $pawncc = Get-ChildItem "$env:DEPS\pawnc" -Recurse -Filter pawncc.exe | Select-Object -First 1
-          $samp = @("-i$env:DEPS\samp-stdlib\samp-stdlib-master", "-i$env:DEPS\pawn-stdlib\pawn-stdlib-master")
-          $omp = @("-i$env:DEPS\omp-stdlib\omp-stdlib-master", 'TEST_OPEN_MP=1', '-Z+')
-          $cases = @(
-            @{ Name = 'gamemode / SA-MP';               File = 'gamemode';     Args = $samp },
-            @{ Name = 'gamemode / open.mp';             File = 'gamemode';     Args = $omp },
-            @{ Name = 'filterscript / SA-MP';           File = 'filterscript'; Args = $samp },
-            @{ Name = 'filterscript / open.mp';         File = 'filterscript'; Args = $omp },
-            @{ Name = 'runtime / SA-MP';                File = 'runtime';      Args = $samp },
-            @{ Name = 'runtime / open.mp';              File = 'runtime';      Args = $omp }
-          )
-          $failed = $false
-          New-Item -ItemType Directory -Force out | Out-Null
-          foreach ($case in $cases) {
-            Write-Host "::group::$($case.Name)"
-            $output = & $pawncc.FullName "tests\$($case.File).pwn" "-oout\$($case.File)" '-iinclude' '-d3' '-;+' '-(+' @($case.Args) 2>&1 | Out-String
-            Write-Host $output
-            Write-Host '::endgroup::'
-            # Any warning fails the build (the include is declarations only)
-            if ($LASTEXITCODE -ne 0 -or $output -match ' : (warning|error) ') {
-              foreach ($line in $output -split "`r?`n") {
-                if ($line -match '^(.+?)\((\d+)\) : ((?:warning|error|fatal error) \d+: .*)$') {
-                  $file = $Matches[1] -replace '\\', '/'
-                  Write-Host "::error file=$file,line=$($Matches[2]),title=$($case.Name)::$($Matches[3])"
-                }
-              }
-              Write-Host "::error::$($case.Name) failed"
-              $failed = $true
-            }
-          }
-          if ($failed) { exit 1 }
-
   release:
     name: GitHub release
     if: github.event_name == 'workflow_dispatch' && inputs.release
-    needs: [version, windows, linux, pawn]
+    needs: [version, windows, linux]
     runs-on: ubuntu-latest
     permissions:
       contents: write

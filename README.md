@@ -116,7 +116,6 @@ The output goes to `dist/plugins/` (SA-MP) and `dist/components/` (open.mp), plu
 `.github/workflows/build.yml` runs **only** on pull requests and when started manually:
 
 - builds Windows and Linux with `build.ps1` and checks the binaries (exports, ELF format, glibc requirement);
-- compiles the test scripts against the SA-MP and open.mp includes (any warning fails the build);
 - uploads the binaries as artifacts (the download contains `plugins/`, `components/` and `include/` directly).
 
 To publish a release, go to **Actions → Build → Run workflow**, tick **"Create a GitHub release with the binaries"** and enter the version (empty = the `VERSION` file). The workflow creates the `vX.Y.Z` tag with `weapon-forge-X.Y.Z-windows.zip`, `weapon-forge-X.Y.Z-linux.tar.gz` and `weapon-forge.inc`.

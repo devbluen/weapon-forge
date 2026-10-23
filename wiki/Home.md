@@ -33,5 +33,5 @@ Server-side **health, armour, damage, death and weapon configuration** for **SA-
 |---|---|
 | [Building](Building) | `build.ps1` (Windows + Linux), `build.sh`, CMake |
 | [CI and Releases](CI-and-Releases) | GitHub Actions workflow and releases |
-| [Testing](Testing) | Compile tests and the runtime test with an NPC |
+| [Testing](Testing) | Runtime test with an NPC on a real server |
 | [FAQ](FAQ) | Common questions and troubleshooting |

@@ -286,7 +286,6 @@ O `.so` é 32 bits, exige glibc 2.17+ e tem o runtime C++ embutido; o `tools/elf
 O workflow `.github/workflows/build.yml` roda **apenas** em pull requests e quando você o executa manualmente:
 
 - compila Windows e Linux com o `build.ps1` e confere os binários (exports, formato ELF, versão da glibc);
-- compila os scripts de teste contra os includes do SA-MP e do open.mp (qualquer warning falha o build);
 - publica os binários como artifacts (o download já traz `plugins/`, `components/` e `include/`, sem zip dentro).
 
 Para criar uma release: **Actions → Build → Run workflow**, marque **"Create a GitHub release with the binaries"** e informe a versão (vazio = arquivo `VERSION`). O workflow cria a tag `vX.Y.Z` e anexa `weapon-forge-X.Y.Z-windows.zip`, `weapon-forge-X.Y.Z-linux.tar.gz` e `weapon-forge.inc`.
@@ -295,7 +294,7 @@ A wiki fica em [`wiki/`](wiki) e é publicada na wiki do GitHub por **Actions �
 
 ## Testes
 
-- `tests/gamemode.pwn` e `tests/filterscript.pwn`: testes de compilação (usados no CI).
+- `tests/gamemode.pwn` e `tests/filterscript.pwn`: exemplos de uso do include (gamemode e filterscript).
 - `tests/runtime.pwn`: teste em servidor real. Conecta um NPC e executa o pipeline: dano, colete, god mode, multiplicadores, `SetPlayerHealth`, vida falsa nos pacotes de sync, morte, `OnPlayerDeath` emitido, respawn e estatísticas. Imprime `[rt] PASS/FAIL` e desliga o servidor. No SA-MP precisa de `maxnpc 1` e de `tests/npc_idle.pwn` compilado em `npcmodes/`; no open.mp, de `"max_bots": 1`.
 
 ## Estrutura

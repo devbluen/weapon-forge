@@ -1,15 +1,8 @@
 # Testing
 
-## Compile tests
+## Example scripts
 
-`tests/gamemode.pwn` and `tests/filterscript.pwn` use the include the way a real script would: compatible names, extras and every callback signature. CI compiles them, plus `tests/runtime.pwn`, against both standard libraries:
-
-```powershell
-pawncc tests/gamemode.pwn -iinclude -i<samp-stdlib> -i<pawn-stdlib>
-pawncc tests/gamemode.pwn -iinclude -i<omp-stdlib> TEST_OPEN_MP=1 -Z+
-```
-
-Any warning fails the CI job.
+`tests/gamemode.pwn` and `tests/filterscript.pwn` use the include the way a real script would: compatible names, extras and every callback signature.
 
 ## Runtime test
 
