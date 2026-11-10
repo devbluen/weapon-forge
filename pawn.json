@@ -1,0 +1,7 @@
+{
+	"supports": ["samp", "openmp"],
+	"plugins": {
+		"windows": "weapon-forge-*-windows.zip",
+		"linux": "weapon-forge-*-linux.tar.gz"
+	}
+}
