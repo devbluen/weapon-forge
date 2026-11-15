@@ -11,6 +11,9 @@
 namespace amxhooks
 {
 	bool Install(void **exports);
+	// Once the other plugins are loaded: if one hooked amx_Exec/FindPublic
+	// over us, hook over it so the plugin stays the outermost.
+	void Relayer();
 	void Remove();
 
 	// Marks the next amx_FindPublic/amx_Exec made by the plugin itself, so

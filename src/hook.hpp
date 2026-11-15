@@ -22,6 +22,9 @@ public:
 
 	bool Installed() const { return target_ != nullptr; }
 	bool HasTrampoline() const { return trampoline_ != nullptr; }
+	void *Target() const { return target_; }
+	// Another hook was written over ours: calls now reach us through it.
+	bool Covered() const;
 
 	// Address to call the original function through.
 	// In toggle mode this is the target itself (see Unpatched).

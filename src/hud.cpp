@@ -47,6 +47,7 @@ namespace wf
 			server::PlayerTextDrawColor(playerid, td, color);
 			server::PlayerTextDrawFont(playerid, td, kFontSprite);
 			server::PlayerTextDrawShow(playerid, td);
+			Debug("healthbar %d: textdraw %d created at %.1f,%.1f size %.1fx%.1f color %08x", playerid, td, x, y, w, h, color);
 			return td;
 		}
 
@@ -253,6 +254,8 @@ namespace wf
 	void SetHealthBarVisible(int playerid, bool toggle)
 	{
 		Player &p = P(playerid);
+
+		Debug("healthbar %d: SetVisible(%d) enabled=%d visible=%d state=%d tds=%d/%d/%d", playerid, toggle, p.health_bar_enabled, p.health_bar_visible, server::GetPlayerState(playerid), p.hb_border, p.hb_background, p.hb_foreground);
 
 		if (!p.health_bar_enabled)
 		{
