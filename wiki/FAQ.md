@@ -44,6 +44,18 @@ NPCs created with `NPC_Create` must be respawned with `NPC_Respawn` in `OnPlayer
 
 C-bug is forbidden (`SetCbugAllowed(false)`) and `SetCbugDeathDelay` is on (default). The delay lets the plugin undo kills made with c-bug. Disable it with `SetCbugDeathDelay(false)`.
 
+### Does it work with streamer and other sampgdk plugins?
+
+Yes, from 1.1.3. Older versions crashed the server inside `streamer.dll` when a player connected and the gamemode lacked a callback the plugin needs (e.g. `OnPlayerRequestClass`). When another plugin hooks the AMX after weapon-forge (always the case for legacy plugins on open.mp), the log shows `AMX hooks layered over another plugin's` and both keep receiving every callback.
+
+### Health and armour stay 0 / the health bar never shows (YSI y_hooks)
+
+Fixed in 1.1.3. YSI `y_hooks` rewrites the script's public table at runtime and older versions then stopped recognising `OnPlayerConnect`, so the player was never tracked. With `WF_SetDebug(1)`, older versions log nothing for the player; 1.1.3 logs `healthbar <id>: ...` lines.
+
+### My script destroys or hides the health bar
+
+As in weapon-config, scripts can't modify the plugin's own player textdraws (health bar, damage feed): `PlayerTextDraw*` calls on them are ignored. A gamemode keeping a stale textdraw id would otherwise destroy the health bar once the id got reused. `WF_SetDebug(1)` logs each blocked call.
+
 ### The server crashes or the plugin says "could not hook the AMX functions"
 
 The plugin couldn't patch the AMX functions. This can happen with other plugins that hook the same functions in an incompatible way. Please open an issue with the server log and the list of plugins.

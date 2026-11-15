@@ -57,7 +57,8 @@ public OnGameModeInit()
 	Check(IsBulletWeapon(WEAPON_M4) && !IsBulletWeapon(WEAPON_KNIFE) && IsMeleeWeapon(WEAPON_KNIFE), "weapon classes");
 
 	new name[32];
-	GetWeaponName(WEAPON_PISTOLWHIP, name);
+	// SA-MP's GetWeaponName has no default for len
+	GetWeaponName(WEAPON_PISTOLWHIP, name, sizeof(name));
 	Check(!strcmp(name, "Pistol whip"), "custom weapon names");
 
 	#if defined _INC_open_mp
