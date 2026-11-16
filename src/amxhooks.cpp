@@ -24,6 +24,7 @@ namespace amxhooks
 		Hook g_exec_hook;
 		Hook g_find_hook;
 		Hook g_register_hook;
+		void **g_exports = nullptr; // until Exec/FindPublic are hooked
 
 		// Public index reported for callbacks a script doesn't implement.
 		// Must be <= -10000: sampgdk (bundled in streamer) reads the publics
@@ -641,13 +642,16 @@ namespace amxhooks
 
 	bool Install(void **exports)
 	{
-		bool ok = g_register_hook.Install(exports[PLUGIN_AMX_EXPORT_Register], reinterpret_cast<void *>(&RegisterDetour));
-		ok = g_find_hook.Install(exports[PLUGIN_AMX_EXPORT_FindPublic], reinterpret_cast<void *>(&FindDetour)) && ok;
-		ok = g_exec_hook.Install(exports[PLUGIN_AMX_EXPORT_Exec], reinterpret_cast<void *>(&ExecDetour)) && ok;
+		g_exports = exports;
 
-		if (!g_exec_hook.HasTrampoline() || !g_find_hook.HasTrampoline() || !g_register_hook.HasTrampoline())
+		// Exec/FindPublic wait for the first script: CrashDetect refuses to load
+		// when amx_Exec is already hooked, and on open.mp components always load
+		// before the legacy plugins.
+		bool ok = g_register_hook.Install(exports[PLUGIN_AMX_EXPORT_Register], reinterpret_cast<void *>(&RegisterDetour));
+
+		if (ok && !g_register_hook.HasTrampoline())
 		{
-			wf::Log("WARN: using fallback hook mode (exec=%d find=%d register=%d)", g_exec_hook.HasTrampoline(), g_find_hook.HasTrampoline(), g_register_hook.HasTrampoline());
+			wf::Log("WARN: using fallback hook mode (register)");
 		}
 
 		return ok;
@@ -655,6 +659,28 @@ namespace amxhooks
 
 	void Relayer()
 	{
+		if (g_exports && !g_exec_hook.Installed())
+		{
+			// All plugins are loaded by now: hook over theirs, staying the outermost
+			bool ok = g_find_hook.Install(g_exports[PLUGIN_AMX_EXPORT_FindPublic], reinterpret_cast<void *>(&FindDetour));
+			ok = g_exec_hook.Install(g_exports[PLUGIN_AMX_EXPORT_Exec], reinterpret_cast<void *>(&ExecDetour)) && ok;
+			g_exports = nullptr;
+
+			if (!ok)
+			{
+				// Fake public indices without the Exec hook would reach the real amx_Exec
+				g_exec_hook.Remove();
+				g_find_hook.Remove();
+				wf::Log("ERROR: could not hook amx_Exec/amx_FindPublic, the plugin callbacks are disabled");
+			}
+			else if (!g_exec_hook.HasTrampoline() || !g_find_hook.HasTrampoline())
+			{
+				wf::Log("WARN: using fallback hook mode (exec=%d find=%d)", g_exec_hook.HasTrampoline(), g_find_hook.HasTrampoline());
+			}
+
+			return;
+		}
+
 		if (g_layered || !g_exec_hook.HasTrampoline() || !g_find_hook.HasTrampoline() || (!g_exec_hook.Covered() && !g_find_hook.Covered()))
 		{
 			return;
@@ -683,6 +709,7 @@ namespace amxhooks
 		g_exec_hook.Remove();
 		g_find_hook.Remove();
 		g_register_hook.Remove();
+		g_exports = nullptr;
 	}
 
 	int FindPublic(AMX *amx, const char *name, int *index)

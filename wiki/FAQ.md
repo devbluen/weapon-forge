@@ -46,7 +46,11 @@ C-bug is forbidden (`SetCbugAllowed(false)`) and `SetCbugDeathDelay` is on (defa
 
 ### Does it work with streamer and other sampgdk plugins?
 
-Yes, from 1.1.3. Older versions crashed the server inside `streamer.dll` when a player connected and the gamemode lacked a callback the plugin needs (e.g. `OnPlayerRequestClass`). When another plugin hooks the AMX after weapon-forge (always the case for legacy plugins on open.mp), the log shows `AMX hooks layered over another plugin's` and both keep receiving every callback.
+Yes, from 1.1.3. Older versions crashed the server inside `streamer.dll` when a player connected and the gamemode lacked a callback the plugin needs (e.g. `OnPlayerRequestClass`). From 1.1.4 weapon-forge hooks `amx_Exec`/`amx_FindPublic` when the first script loads, after every plugin, so it sits over their hooks and both keep receiving every callback.
+
+### "CrashDetect must be loaded before 'weapon-forge.dll'" / `Function not registered: PrintBacktrace`
+
+Fixed in 1.1.4. CrashDetect refuses to load when `amx_Exec` is already hooked, and on open.mp components always load before legacy plugins, so its natives (`PrintBacktrace`, ...) were missing and gamemodes compiled with `crashdetect.inc` (e.g. through YSI) didn't start. weapon-forge now hooks `amx_Exec` after the plugins load, in any plugin order. CrashDetect itself still has to be listed before streamer and other sampgdk plugins.
 
 ### Health and armour stay 0 / the health bar never shows (YSI y_hooks)
 

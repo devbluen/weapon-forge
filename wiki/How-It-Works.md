@@ -11,7 +11,7 @@ Both paths run the same code. The only server-specific parts are how the plugin 
 
 ## Hooking the AMX
 
-SA-MP and open.mp run scripts with the Pawn abstract machine, and both expose its functions (`amx_Exec`, `amx_FindPublic`, `amx_Register`, ...) to plugins. These are the very functions the server uses internally. weapon-forge installs x86 detours on three of them.
+SA-MP and open.mp run scripts with the Pawn abstract machine, and both expose its functions (`amx_Exec`, `amx_FindPublic`, `amx_Register`, ...) to plugins. These are the very functions the server uses internally. weapon-forge installs x86 detours on three of them. `amx_Register` is hooked at startup; `amx_Exec` and `amx_FindPublic` when the first script loads, once every plugin has installed its own hooks (CrashDetect refuses to load if `amx_Exec` is already hooked).
 
 ### `amx_Register`: natives
 
