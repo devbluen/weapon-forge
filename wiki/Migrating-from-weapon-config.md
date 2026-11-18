@@ -38,6 +38,7 @@ Define `WF_NO_COMPAT` before the include if those names clash with your own code
 | `OnPlayerGiveDamage` / `OnPlayerTakeDamage` are not called in the script | Same by default; `WF_SetForwardDamageCallbacks(true)` calls them |
 | Cancelling a real client death in `OnPlayerDamage` respawns the player in place | The death is hidden from the scripts, but the client still respawns normally |
 | Settings survive only while the script is loaded | Settings are reset to the defaults on `gmx` (same result) |
+| A gun hit whose amount is not GTA's `weapon.dat` value is always rejected | Same for the multiplier types; with `DAMAGE_TYPE_STATIC` the amount is not checked (it is never used), so clients with modified weapons work |
 
 ## Compile-time defines
 

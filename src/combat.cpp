@@ -281,6 +281,11 @@ namespace wf
 
 			w = weapons::Get(weaponid);
 
+			// A fixed damage (DAMAGE_TYPE_STATIC) never uses the amount the game reports, so
+			// checking it against GTA's weapon.dat protects nothing and refuses every hit of a
+			// client with modified weapons. Only the multiplier types keep the strict check.
+			const bool fixed_damage = w && w->damage_type == weapons::DAMAGE_TYPE_STATIC;
+
 			if (melee)
 			{
 				float dist = DistanceToPlayer(playerid, issuerid);
@@ -301,7 +306,11 @@ namespace wf
 				bullets = amount / 4.950000286102294921875f;
 				if (8.0f - bullets < -0.05f)
 				{
-					return WC_INVALID_DAMAGE;
+					if (!fixed_damage)
+					{
+						return WC_INVALID_DAMAGE;
+					}
+					bullets = 1.0f;
 				}
 				break;
 
@@ -311,7 +320,11 @@ namespace wf
 				bullets = amount / 3.30000019073486328125f;
 				if (15.0f - bullets < -0.05f)
 				{
-					return WC_INVALID_DAMAGE;
+					if (!fixed_damage)
+					{
+						return WC_INVALID_DAMAGE;
+					}
+					bullets = 1.0f;
 				}
 				break;
 			}
@@ -323,7 +336,13 @@ namespace wf
 				// The damage for each bullet has been tampered with
 				if (f > 0.01f && f < 0.99f)
 				{
-					return WC_INVALID_DAMAGE;
+					if (!fixed_damage)
+					{
+						return WC_INVALID_DAMAGE;
+					}
+
+					// Not GTA pellets: a fixed damage shot counts as one hit
+					bullets = 1.0f;
 				}
 
 				// Divide the damage amount by the number of bullets
@@ -337,7 +356,7 @@ namespace wf
 					return WC_INVALID_DAMAGE;
 				}
 			}
-			else if (weaponid == weapons::DEAGLE)
+			else if (weaponid == weapons::DEAGLE && !fixed_damage)
 			{
 				if (!Is(amount, 46.200000762939453125f) && !Is(amount, 23.1000003814697265625f))
 				{
@@ -381,7 +400,7 @@ namespace wf
 				break;
 			}
 
-			if (def_amount != 0.0f && !Is(def_amount, amount))
+			if (def_amount != 0.0f && !fixed_damage && !Is(def_amount, amount))
 			{
 				return WC_INVALID_DAMAGE;
 			}

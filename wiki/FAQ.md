@@ -46,7 +46,7 @@ C-bug is forbidden (`SetCbugAllowed(false)`) and `SetCbugDeathDelay` is on (defa
 
 ### Does it work with streamer and other sampgdk plugins?
 
-Yes, from 1.1.3. Older versions crashed the server inside `streamer.dll` when a player connected and the gamemode lacked a callback the plugin needs (e.g. `OnPlayerRequestClass`). From 1.1.4 weapon-forge hooks `amx_Exec`/`amx_FindPublic` when the first script loads, after every plugin, so it sits over their hooks and both keep receiving every callback.
+Yes, from 1.1.4. Older versions crashed the server inside `streamer.dll` when a player connected and the gamemode lacked a callback the plugin needs (e.g. `OnPlayerRequestClass`). weapon-forge now hooks `amx_Exec`/`amx_FindPublic` when the first script loads, after every plugin, so it sits over their hooks and both keep receiving every callback.
 
 ### "CrashDetect must be loaded before 'weapon-forge.dll'" / `Function not registered: PrintBacktrace`
 
@@ -54,7 +54,7 @@ Fixed in 1.1.4. CrashDetect refuses to load when `amx_Exec` is already hooked, a
 
 ### Health and armour stay 0 / the health bar never shows (YSI y_hooks)
 
-Fixed in 1.1.3. YSI `y_hooks` rewrites the script's public table at runtime and older versions then stopped recognising `OnPlayerConnect`, so the player was never tracked. With `WF_SetDebug(1)`, older versions log nothing for the player; 1.1.3 logs `healthbar <id>: ...` lines.
+Fixed in 1.1.3 (callbacks) and 1.1.4 (publics the plugin calls itself). YSI `y_hooks` rewrites the script's public table at runtime and older versions then stopped recognising `OnPlayerConnect`, so the player was never tracked. From 1.1.4, `WF_SetDebug(1)` logs `healthbar <id>: ...` lines for every player the plugin tracks.
 
 ### My script destroys or hides the health bar
 

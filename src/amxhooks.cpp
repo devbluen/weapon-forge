@@ -184,22 +184,12 @@ namespace amxhooks
 			return -1;
 		}
 
-		// Read on every call, not cached: YSI y_hooks rewrites and shrinks the
-		// public table at runtime, so a cached index -> name map goes stale
-		// (OnPlayerConnect was then never recognised).
-		int CallbackByPublic(AMX *amx, int index)
-		{
-			auto *hdr = reinterpret_cast<AMX_HEADER *>(amx->base);
-
-			if (!hdr || hdr->defsize != sizeof(AMX_FUNCSTUBNT) || index >= (hdr->natives - hdr->publics) / hdr->defsize)
-			{
-				return -1;
-			}
-
-			auto *stubs = reinterpret_cast<AMX_FUNCSTUBNT *>(amx->base + hdr->publics);
-			return CallbackByName(reinterpret_cast<const char *>(amx->base + stubs[index].nameofs));
-		}
-
+		// The public's name is read from the AMX header on every call instead of a map
+		// cached on the first callback: YSI (y_hooks) renames and re-sorts the public
+		// table at runtime, inside the gamemode's first OnGameModeInit, so a map built
+		// before that sends callbacks to the wrong index (or lets them through unseen).
+		// Negative indices other than the fake ones were invented by a plugin hooked
+		// below us (sampgdk) and are recorded by FindLogic.
 		int CallbackByIndex(AMX *amx, int index)
 		{
 			if (index >= kFakeIndex && index < kFakeIndex + CB_COUNT)
@@ -220,7 +210,22 @@ namespace amxhooks
 				return cb == it->second.end() ? -1 : cb->second;
 			}
 
-			return CallbackByPublic(amx, index);
+			auto *hdr = reinterpret_cast<AMX_HEADER *>(amx->base);
+
+			if (!hdr || hdr->defsize != sizeof(AMX_FUNCSTUBNT))
+			{
+				return -1;
+			}
+
+			int count = (hdr->natives - hdr->publics) / hdr->defsize;
+
+			if (index >= count)
+			{
+				return -1;
+			}
+
+			auto *stubs = reinterpret_cast<AMX_FUNCSTUBNT *>(amx->base + hdr->publics);
+			return CallbackByName(reinterpret_cast<const char *>(amx->base + stubs[index].nameofs));
 		}
 
 		// Discards the arguments pushed for a call that won't run
@@ -552,17 +557,22 @@ namespace amxhooks
 
 			int err = CallFind(amx, name, index);
 
-			// A plugin below us invented this index (sampgdk: <= -10000);
-			// -1 and -2 are AMX_EXEC_MAIN and AMX_EXEC_CONT
-			if (err == AMX_ERR_NONE && name && index && *index < -2 && CallbackByName(name) >= 0)
+			if (!name || !index)
 			{
-				g_foreign[amx][*index] = static_cast<signed char>(CallbackByName(name));
+				return err;
 			}
 
-			if (err != AMX_ERR_NONE && name && index)
-			{
-				int cb = CallbackByName(name);
+			int cb = CallbackByName(name);
 
+			// A plugin below us invented this index (sampgdk: <= -10000);
+			// -1 and -2 are AMX_EXEC_MAIN and AMX_EXEC_CONT
+			if (err == AMX_ERR_NONE && *index < -2 && cb >= 0)
+			{
+				g_foreign[amx][*index] = static_cast<signed char>(cb);
+			}
+
+			if (err != AMX_ERR_NONE)
+			{
 				// Raise the callbacks the plugin needs in one script at least
 				if (cb >= 0 && cb < kFirstFilterOnly && (!scripts::GameMode() || scripts::GameMode() == amx))
 				{

@@ -65,6 +65,7 @@ Diferenças em relação ao weapon-config:
 - Cancelar uma **morte real** do cliente (ex.: veículo explodindo com o jogador dentro) em `OnPlayerDamage` esconde a morte dos scripts, mas o cliente ainda passa pelo respawn normal.
 - `OnPlayerGiveDamage`/`OnPlayerTakeDamage` não chegam aos scripts, igual ao weapon-config. Use `WF_SetForwardDamageCallbacks(true)` se precisar deles.
 - No `gmx`, todas as configurações voltam ao padrão (como no weapon-config, onde cada carregamento começa do zero).
+- Armas com `DAMAGE_TYPE_STATIC` não têm o valor de dano do cliente comparado com o `weapon.dat` do GTA (o valor nunca é usado), então clientes com armas modificadas funcionam. Uma espingarda fixa com chumbos fora do padrão conta como um acerto. Os tipos multiplicador continuam com a validação rígida.
 - NPCs nativos do open.mp (`NPC_Create`) precisam de `NPC_Respawn` em `OnPlayerDeathFinished`. NPCs do SA-MP são respawnados pelo plugin.
 
 ## Como funciona
