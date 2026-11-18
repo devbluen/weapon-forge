@@ -122,8 +122,6 @@ namespace amxhooks
 
 		bool g_internal_find = false;
 
-		std::unordered_map<AMX *, std::vector<signed char>> g_public_map;
-
 		int CallExec(AMX *amx, cell *retval, int index)
 		{
 			Hook::Unpatched guard(g_exec_hook);
@@ -160,33 +158,10 @@ namespace amxhooks
 			return -1;
 		}
 
-		const std::vector<signed char> &PublicMap(AMX *amx)
-		{
-			auto it = g_public_map.find(amx);
-
-			if (it != g_public_map.end())
-			{
-				return it->second;
-			}
-
-			std::vector<signed char> map;
-			auto *hdr = reinterpret_cast<AMX_HEADER *>(amx->base);
-
-			if (hdr && hdr->defsize == sizeof(AMX_FUNCSTUBNT))
-			{
-				int count = (hdr->natives - hdr->publics) / hdr->defsize;
-				auto *stubs = reinterpret_cast<AMX_FUNCSTUBNT *>(amx->base + hdr->publics);
-				map.resize(static_cast<size_t>(count), -1);
-
-				for (int i = 0; i < count; ++i)
-				{
-					map[static_cast<size_t>(i)] = static_cast<signed char>(CallbackByName(reinterpret_cast<const char *>(amx->base + stubs[i].nameofs)));
-				}
-			}
-
-			return g_public_map.emplace(amx, std::move(map)).first->second;
-		}
-
+		// The public's name is read from the AMX header on every call instead of a map
+		// cached on the first callback: YSI (y_hooks) renames and re-sorts the public
+		// table at runtime, inside the gamemode's first OnGameModeInit, so a map built
+		// before that sends callbacks to the wrong index (or lets them through unseen).
 		int CallbackByIndex(AMX *amx, int index)
 		{
 			if (index >= kFakeIndex && index < kFakeIndex + CB_COUNT)
@@ -199,8 +174,22 @@ namespace amxhooks
 				return -1;
 			}
 
-			const auto &map = PublicMap(amx);
-			return static_cast<size_t>(index) < map.size() ? map[static_cast<size_t>(index)] : -1;
+			auto *hdr = reinterpret_cast<AMX_HEADER *>(amx->base);
+
+			if (!hdr || hdr->defsize != sizeof(AMX_FUNCSTUBNT))
+			{
+				return -1;
+			}
+
+			int count = (hdr->natives - hdr->publics) / hdr->defsize;
+
+			if (index >= count)
+			{
+				return -1;
+			}
+
+			auto *stubs = reinterpret_cast<AMX_FUNCSTUBNT *>(amx->base + hdr->publics);
+			return CallbackByName(reinterpret_cast<const char *>(amx->base + stubs[index].nameofs));
 		}
 
 		// Discards the arguments pushed for a call that won't run
@@ -655,8 +644,6 @@ namespace amxhooks
 
 	void OnAmxUnload(AMX *amx)
 	{
-		g_public_map.erase(amx);
-
 		for (Event &e : g_events)
 		{
 			for (int i = 0; i < e.seen_count; ++i)
