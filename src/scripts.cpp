@@ -5,7 +5,6 @@
 #include "server.hpp"
 
 #include <algorithm>
-#include <unordered_map>
 
 namespace scripts
 {
@@ -14,7 +13,6 @@ namespace scripts
 		struct Entry
 		{
 			AMX *amx;
-			std::unordered_map<std::string, int> publics;
 		};
 
 		std::vector<Entry> g_entries;
@@ -32,15 +30,10 @@ namespace scripts
 			return nullptr;
 		}
 
+		// Not cached: YSI y_hooks rewrites the public table at runtime, so a
+		// cached index could run the wrong function.
 		int PublicIndex(Entry &e, const char *name)
 		{
-			auto it = e.publics.find(name);
-
-			if (it != e.publics.end())
-			{
-				return it->second;
-			}
-
 			int index = -1;
 
 			if (amxhooks::FindPublic(e.amx, name, &index) != AMX_ERR_NONE)
@@ -48,7 +41,6 @@ namespace scripts
 				index = -1;
 			}
 
-			e.publics.emplace(name, index);
 			return index;
 		}
 
@@ -62,7 +54,7 @@ namespace scripts
 	{
 		if (!Find(amx))
 		{
-			g_entries.push_back({amx, {}});
+			g_entries.push_back({amx});
 		}
 
 		UpdateContext();

@@ -10,7 +10,13 @@
 // - amx_Exec: processes server callbacks before the scripts see them
 namespace amxhooks
 {
+	// Hooks amx_Register only; amx_Exec/FindPublic are hooked by Relayer().
 	bool Install(void **exports);
+	// On every script load. The first time (all plugins loaded by then) it
+	// hooks amx_Exec/FindPublic over the other plugins' hooks (CrashDetect
+	// refuses to load if amx_Exec is already hooked). After that: if a plugin
+	// hooked them over us, hook over it so the plugin stays the outermost.
+	void Relayer();
 	void Remove();
 
 	// Marks the next amx_FindPublic/amx_Exec made by the plugin itself, so

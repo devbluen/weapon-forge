@@ -43,3 +43,13 @@ Expected result on both servers:
 ```
 
 As a legacy plugin on open.mp, the two sync packet checks fail, which is expected (no network access in that mode).
+
+## Compatibility test
+
+`tests/compat.pwn` runs the plugin next to streamer (whose bundled sampgdk also hooks the AMX) in a gamemode using YSI `y_hooks` (which rewrites the public table) and missing `OnPlayerRequestClass`, `OnPlayerStateChange` and `OnPlayerUpdate`. It checks that the server doesn't crash, `WF_SetPlayerHealth`/`WF_SetPlayerArmour` work, the health bar is accepted and survives a script destroying stale textdraw ids (open.mp), and `OnPlayerDeathFinished` reaches both the y_hooks hook and the public.
+
+Compile it like `runtime.pwn`, with the streamer and YSI includes, and load streamer: `plugins streamer weapon-forge` on SA-MP (also try `weapon-forge streamer`), `"legacy_plugins": ["streamer"]` on open.mp. Expected result:
+
+```
+[compat] DONE fails=0
+```

@@ -6,7 +6,7 @@
 native WF_SetDebug(level);
 ```
 
-`1` prints damage, shots and rejected hits to the server console. `0` (default) turns it off. Useful while tuning weapons; don't leave it on in production.
+`1` prints damage, shots and rejected hits to the server console, plus when the health bar is created or hidden and every script call blocked on the plugin's own textdraws. `0` (default) turns it off. Useful while tuning weapons; don't leave it on in production.
 
 ## WF_IsOpenMP
 

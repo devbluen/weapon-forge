@@ -24,9 +24,14 @@ namespace amxhooks
 		Hook g_exec_hook;
 		Hook g_find_hook;
 		Hook g_register_hook;
+		void **g_exports = nullptr; // until Exec/FindPublic are hooked
 
-		// Public index reported for callbacks a script doesn't implement
-		constexpr int kFakeIndex = 0x7F000000;
+		// Public index reported for callbacks a script doesn't implement.
+		// Must be <= -10000: sampgdk (bundled in streamer) reads the publics
+		// table unchecked for any index > -10000 and crashed on 0x7F000000+cb.
+		// -2^29 also keeps an unchecked 32-bit `publics + index * 8` lookup
+		// (amx_GetPublic with a negative index) inside the AMX header.
+		constexpr int kFakeIndex = -0x20000000;
 
 		enum Callback
 		{
@@ -122,16 +127,37 @@ namespace amxhooks
 
 		bool g_internal_find = false;
 
-		int CallExec(AMX *amx, cell *retval, int index)
+		// When a plugin (sampgdk inside streamer) hooks amx_Exec/amx_FindPublic
+		// after us, a second hook is put over it so we stay the outermost one
+		// and see the public indices it invents; the first one passes through.
+		Hook g_exec_top;
+		Hook g_find_top;
+		bool g_layered = false;
+
+		// Public indices invented by the plugins below us, per script
+		std::unordered_map<AMX *, std::unordered_map<int, signed char>> g_foreign;
+
+		int ExecOriginal(AMX *amx, cell *retval, int index)
 		{
 			Hook::Unpatched guard(g_exec_hook);
 			return reinterpret_cast<ExecFn>(g_exec_hook.Original())(amx, retval, index);
 		}
 
-		int CallFind(AMX *amx, const char *name, int *index)
+		int FindOriginal(AMX *amx, const char *name, int *index)
 		{
 			Hook::Unpatched guard(g_find_hook);
 			return reinterpret_cast<FindFn>(g_find_hook.Original())(amx, name, index);
+		}
+
+		// Next in the chain: the plugins hooked below us, then the original
+		int CallExec(AMX *amx, cell *retval, int index)
+		{
+			return g_layered ? reinterpret_cast<ExecFn>(g_exec_top.Original())(amx, retval, index) : ExecOriginal(amx, retval, index);
+		}
+
+		int CallFind(AMX *amx, const char *name, int *index)
+		{
+			return g_layered ? reinterpret_cast<FindFn>(g_find_top.Original())(amx, name, index) : FindOriginal(amx, name, index);
 		}
 
 		int CallRegister(AMX *amx, const AMX_NATIVE_INFO *list, int number)
@@ -162,6 +188,8 @@ namespace amxhooks
 		// cached on the first callback: YSI (y_hooks) renames and re-sorts the public
 		// table at runtime, inside the gamemode's first OnGameModeInit, so a map built
 		// before that sends callbacks to the wrong index (or lets them through unseen).
+		// Negative indices other than the fake ones were invented by a plugin hooked
+		// below us (sampgdk) and are recorded by FindLogic.
 		int CallbackByIndex(AMX *amx, int index)
 		{
 			if (index >= kFakeIndex && index < kFakeIndex + CB_COUNT)
@@ -171,7 +199,15 @@ namespace amxhooks
 
 			if (index < 0)
 			{
-				return -1;
+				auto it = g_foreign.find(amx);
+
+				if (it == g_foreign.end())
+				{
+					return -1;
+				}
+
+				auto cb = it->second.find(index);
+				return cb == it->second.end() ? -1 : cb->second;
 			}
 
 			auto *hdr = reinterpret_cast<AMX_HEADER *>(amx->base);
@@ -428,7 +464,7 @@ namespace amxhooks
 			}
 		}
 
-		int ExecDetour(AMX *amx, cell *retval, int index)
+		int ExecLogic(AMX *amx, cell *retval, int index)
 		{
 			if (g_internal_exec.amx == amx && g_internal_exec.index == index)
 			{
@@ -444,7 +480,7 @@ namespace amxhooks
 			}
 
 			int cb = CallbackByIndex(amx, index);
-			bool fake = index >= kFakeIndex;
+			bool fake = index >= kFakeIndex && index < kFakeIndex + CB_COUNT;
 
 			if (cb < 0)
 			{
@@ -512,7 +548,7 @@ namespace amxhooks
 			return err;
 		}
 
-		int FindDetour(AMX *amx, const char *name, int *index)
+		int FindLogic(AMX *amx, const char *name, int *index)
 		{
 			if (g_internal_find)
 			{
@@ -521,10 +557,22 @@ namespace amxhooks
 
 			int err = CallFind(amx, name, index);
 
-			if (err != AMX_ERR_NONE && name && index)
+			if (!name || !index)
 			{
-				int cb = CallbackByName(name);
+				return err;
+			}
 
+			int cb = CallbackByName(name);
+
+			// A plugin below us invented this index (sampgdk: <= -10000);
+			// -1 and -2 are AMX_EXEC_MAIN and AMX_EXEC_CONT
+			if (err == AMX_ERR_NONE && *index < -2 && cb >= 0)
+			{
+				g_foreign[amx][*index] = static_cast<signed char>(cb);
+			}
+
+			if (err != AMX_ERR_NONE)
+			{
 				// Raise the callbacks the plugin needs in one script at least
 				if (cb >= 0 && cb < kFirstFilterOnly && (!scripts::GameMode() || scripts::GameMode() == amx))
 				{
@@ -534,6 +582,18 @@ namespace amxhooks
 			}
 
 			return err;
+		}
+
+		// The first hooks; once layered they're only reached through the
+		// plugin hooked over them, so they just pass through.
+		int ExecDetour(AMX *amx, cell *retval, int index)
+		{
+			return g_layered ? ExecOriginal(amx, retval, index) : ExecLogic(amx, retval, index);
+		}
+
+		int FindDetour(AMX *amx, const char *name, int *index)
+		{
+			return g_layered ? FindOriginal(amx, name, index) : FindLogic(amx, name, index);
 		}
 
 		int RegisterDetour(AMX *amx, const AMX_NATIVE_INFO *list, int number)
@@ -560,7 +620,7 @@ namespace amxhooks
 					continue;
 				}
 
-				AMX_NATIVE replacement = wf::NativeOverride(native.name);
+				AMX_NATIVE replacement = wf::NativeOverride(native.name, native.func);
 
 				if (replacement == native.func)
 				{
@@ -592,23 +652,74 @@ namespace amxhooks
 
 	bool Install(void **exports)
 	{
-		bool ok = g_register_hook.Install(exports[PLUGIN_AMX_EXPORT_Register], reinterpret_cast<void *>(&RegisterDetour));
-		ok = g_find_hook.Install(exports[PLUGIN_AMX_EXPORT_FindPublic], reinterpret_cast<void *>(&FindDetour)) && ok;
-		ok = g_exec_hook.Install(exports[PLUGIN_AMX_EXPORT_Exec], reinterpret_cast<void *>(&ExecDetour)) && ok;
+		g_exports = exports;
 
-		if (!g_exec_hook.HasTrampoline() || !g_find_hook.HasTrampoline() || !g_register_hook.HasTrampoline())
+		// Exec/FindPublic wait for the first script: CrashDetect refuses to load
+		// when amx_Exec is already hooked, and on open.mp components always load
+		// before the legacy plugins.
+		bool ok = g_register_hook.Install(exports[PLUGIN_AMX_EXPORT_Register], reinterpret_cast<void *>(&RegisterDetour));
+
+		if (ok && !g_register_hook.HasTrampoline())
 		{
-			wf::Log("WARN: using fallback hook mode (exec=%d find=%d register=%d)", g_exec_hook.HasTrampoline(), g_find_hook.HasTrampoline(), g_register_hook.HasTrampoline());
+			wf::Log("WARN: using fallback hook mode (register)");
 		}
 
 		return ok;
 	}
 
+	void Relayer()
+	{
+		if (g_exports && !g_exec_hook.Installed())
+		{
+			// All plugins are loaded by now: hook over theirs, staying the outermost
+			bool ok = g_find_hook.Install(g_exports[PLUGIN_AMX_EXPORT_FindPublic], reinterpret_cast<void *>(&FindDetour));
+			ok = g_exec_hook.Install(g_exports[PLUGIN_AMX_EXPORT_Exec], reinterpret_cast<void *>(&ExecDetour)) && ok;
+			g_exports = nullptr;
+
+			if (!ok)
+			{
+				// Fake public indices without the Exec hook would reach the real amx_Exec
+				g_exec_hook.Remove();
+				g_find_hook.Remove();
+				wf::Log("ERROR: could not hook amx_Exec/amx_FindPublic, the plugin callbacks are disabled");
+			}
+			else if (!g_exec_hook.HasTrampoline() || !g_find_hook.HasTrampoline())
+			{
+				wf::Log("WARN: using fallback hook mode (exec=%d find=%d)", g_exec_hook.HasTrampoline(), g_find_hook.HasTrampoline());
+			}
+
+			return;
+		}
+
+		if (g_layered || !g_exec_hook.HasTrampoline() || !g_find_hook.HasTrampoline() || (!g_exec_hook.Covered() && !g_find_hook.Covered()))
+		{
+			return;
+		}
+
+		g_exec_top.Install(g_exec_hook.Target(), reinterpret_cast<void *>(&ExecLogic));
+		g_find_top.Install(g_find_hook.Target(), reinterpret_cast<void *>(&FindLogic));
+
+		if (!g_exec_top.HasTrampoline() || !g_find_top.HasTrampoline())
+		{
+			g_exec_top.Remove();
+			g_find_top.Remove();
+			wf::Log("WARN: another plugin hooked the AMX after weapon-forge and it could not be layered over it");
+			return;
+		}
+
+		g_layered = true;
+		wf::Log("AMX hooks layered over another plugin's (e.g. streamer/sampgdk)");
+	}
+
 	void Remove()
 	{
+		g_exec_top.Remove();
+		g_find_top.Remove();
+		g_layered = false;
 		g_exec_hook.Remove();
 		g_find_hook.Remove();
 		g_register_hook.Remove();
+		g_exports = nullptr;
 	}
 
 	int FindPublic(AMX *amx, const char *name, int *index)
@@ -618,8 +729,9 @@ namespace amxhooks
 			return amx::FindPublic(amx, name, index);
 		}
 
+		// Straight to the original: indices invented by other plugins can change
 		g_internal_find = true;
-		int err = CallFind(amx, name, index);
+		int err = FindOriginal(amx, name, index);
 		g_internal_find = false;
 		return err;
 	}
@@ -644,6 +756,8 @@ namespace amxhooks
 
 	void OnAmxUnload(AMX *amx)
 	{
+		g_foreign.erase(amx);
+
 		for (Event &e : g_events)
 		{
 			for (int i = 0; i < e.seen_count; ++i)

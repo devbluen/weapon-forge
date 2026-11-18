@@ -1031,6 +1031,7 @@ namespace wf
 
 			if (!Connected(playerid))
 			{
+				Debug("healthbar %d: EnableHealthBarForPlayer ignored, player not tracked as connected", playerid);
 				return 0;
 			}
 
@@ -1815,15 +1816,77 @@ namespace wf
 			{"IsPlayerInRaceCheckpoint", WF_IsPlayerInRaceCheckpoint},
 			{"SetPlayerSpecialAction", WF_SetPlayerSpecialAction},
 		};
+
+		// Like weapon-config, scripts can't modify the plugin's own player
+		// textdraws: a stale id kept by a gamemode would otherwise destroy or
+		// hide the health bar / damage feed after the id got reused.
+		const char *const kTextDrawNatives[] = {
+			"PlayerTextDrawDestroy", "PlayerTextDrawShow", "PlayerTextDrawHide",
+			"PlayerTextDrawSetString", "PlayerTextDrawLetterSize", "PlayerTextDrawTextSize",
+			"PlayerTextDrawAlignment", "PlayerTextDrawColor", "PlayerTextDrawColour",
+			"PlayerTextDrawUseBox", "PlayerTextDrawBoxColor", "PlayerTextDrawBoxColour",
+			"PlayerTextDrawSetShadow", "PlayerTextDrawSetOutline", "PlayerTextDrawBackgroundColor",
+			"PlayerTextDrawBackgroundColour", "PlayerTextDrawFont", "PlayerTextDrawSetProportional",
+			"PlayerTextDrawSetSelectable", "PlayerTextDrawSetPreviewModel", "PlayerTextDrawSetPreviewRot",
+			"PlayerTextDrawSetPreviewVehCol", "PlayerTextDrawSetPos",
+		};
+
+		constexpr int kTextDrawNativeCount = static_cast<int>(sizeof(kTextDrawNatives) / sizeof(kTextDrawNatives[0]));
+		AMX_NATIVE g_textdraw_original[kTextDrawNativeCount] = {};
+
+		bool IsInternalTextDraw(cell playerid, cell td)
+		{
+			if (!ValidPlayer(playerid) || td == kInvalidTextDraw)
+			{
+				return false;
+			}
+
+			const Player &p = P(playerid);
+			return td == p.hb_border || td == p.hb_background || td == p.hb_foreground || td == p.feed_given_td || td == p.feed_taken_td;
+		}
+
+		template <int N>
+		cell TextDrawGuard(AMX *amx, cell *params)
+		{
+			if (Args(params, 2) && IsInternalTextDraw(params[1], params[2]))
+			{
+				Debug("blocked %s(%d, %d): it's the plugin's own textdraw", kTextDrawNatives[N], params[1], params[2]);
+				return 0;
+			}
+
+			return g_textdraw_original[N] ? g_textdraw_original[N](amx, params) : 0;
+		}
+
+		template <int... I>
+		struct TextDrawGuards
+		{
+			static constexpr AMX_NATIVE kFuncs[sizeof...(I)] = {&TextDrawGuard<I>...};
+		};
+
+		using Guards = TextDrawGuards<0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22>;
+		static_assert(sizeof(Guards::kFuncs) / sizeof(AMX_NATIVE) == kTextDrawNativeCount, "textdraw guard table out of sync");
 	}
 
-	AMX_NATIVE NativeOverride(const char *name)
+	AMX_NATIVE NativeOverride(const char *name, AMX_NATIVE original)
 	{
 		for (const auto &native : kOverrides)
 		{
 			if (!std::strcmp(native.name, name))
 			{
 				return native.func;
+			}
+		}
+
+		for (int i = 0; i < kTextDrawNativeCount; ++i)
+		{
+			if (!std::strcmp(kTextDrawNatives[i], name))
+			{
+				if (!g_textdraw_original[i] && original != Guards::kFuncs[i])
+				{
+					g_textdraw_original[i] = original;
+				}
+
+				return Guards::kFuncs[i];
 			}
 		}
 

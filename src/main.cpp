@@ -162,6 +162,8 @@ namespace wf
 
 	int AmxLoad(AMX *amx)
 	{
+		// Plugins are all loaded before the first script
+		amxhooks::Relayer();
 		scripts::OnLoad(amx);
 		return RegisterNatives(amx);
 	}

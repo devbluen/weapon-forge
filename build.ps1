@@ -228,9 +228,16 @@ function Build-Linux([string]$Sdk) {
     Invoke-Native $zig $zigArgs 'Linux build'
 
     $candidates = if ($OnWindows) { @('python', 'py') } else { @('python3', 'python') }
-    $python = Get-Command $candidates -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
+    # Only a Python that runs: Windows has a "python" alias that just opens the Microsoft Store
+    $python = Get-Command $candidates -CommandType Application -ErrorAction SilentlyContinue | Where-Object {
+        try { $null = & $_.Source --version 2>&1; $LASTEXITCODE -eq 0 } catch { $false }
+    } | Select-Object -First 1
+    # The probe of a broken alias leaves its exit code behind, which CI would report as a failure
+    $global:LASTEXITCODE = 0
     if ($python) {
         Invoke-Native $python.Source @((Join-Path $Root 'tools/elfcheck.py'), $output) 'ELF check'
+    } else {
+        Write-Host 'ELF check skipped: Python not found (tools/elfcheck.py)'
     }
 
     return $output

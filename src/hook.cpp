@@ -269,6 +269,11 @@ void Hook::Patch()
 	patched_ = true;
 }
 
+bool Hook::Covered() const
+{
+	return target_ && patched_ && std::memcmp(target_, jump_, sizeof(jump_)) != 0;
+}
+
 void Hook::Unpatch()
 {
 	std::memcpy(target_, original_, patch_size_);
