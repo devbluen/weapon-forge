@@ -18,6 +18,8 @@ Sets how much damage a weapon deals.
 | `DAMAGE_TYPE_RANGE` | Static damage by distance (bullet weapons only) |
 | `DAMAGE_TYPE_RANGE_MULTIPLIER` | Multiplier by distance (bullet weapons only) |
 
+With `DAMAGE_TYPE_STATIC` the damage amount sent by the client is not compared with GTA's `weapon.dat` values, since it is never used: clients with modified weapons (other damage, single-bullet shotguns) are accepted, and a shotgun hit that is not a whole number of pellets counts as one hit. The multiplier types keep the strict check, because there the client amount is the base of the damage.
+
 For the range types, `amount` applies from 0 m. After it come pairs of `distance, value`: each value applies from its distance on. Up to 8 ranges.
 
 ```pawn
