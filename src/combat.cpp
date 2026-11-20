@@ -42,14 +42,9 @@ namespace wf
 			return server::IsPlayerInAnyVehicle(playerid) || server::GetPlayerSurfingVehicleID(playerid) != kInvalidVehicle;
 		}
 
-		int ProcessDamage(int &playerid, int &issuerid, float &amount, int &weaponid, int &bodypart, float &bullets)
+		// Adjust invalid amounts caused by an animation bug
+		void FixAnimationBugAmount(float &amount, int weaponid)
 		{
-			if (amount < 0.0f)
-			{
-				return WC_INVALID_DAMAGE;
-			}
-
-			// Adjust invalid amounts caused by an animation bug
 			if (Is(amount, 3.63000011444091796875f) || Is(amount, 5.940000057220458984375f) || Is(amount, 5.610000133514404296875f))
 			{
 				amount = 2.6400001049041748046875f;
@@ -87,6 +82,33 @@ namespace wf
 				default:
 					amount = 6.6000003814697265625f;
 				}
+			}
+		}
+
+		int ProcessDamage(int &playerid, int &issuerid, float &amount, int &weaponid, int &bodypart, float &bullets)
+		{
+			if (amount < 0.0f)
+			{
+				return WC_INVALID_DAMAGE;
+			}
+
+			// A bullet weapon with a fixed damage, fired from beyond melee range. The amount the
+			// game reports is never used for it, and the remaps below (animation bug, pistol
+			// whip, punch while switching weapon) only happen at melee range: with modified
+			// weapon.dat values (AK-47, sawn-off...) they turned real shots into melee hits,
+			// which were then rejected as too far.
+			bool ranged_fixed = false;
+
+			if (weapons::IsBullet(weaponid) && ValidPlayer(issuerid) && P(issuerid).connected)
+			{
+				const weapons::Weapon *bw = weapons::Get(weaponid);
+				const weapons::Weapon *fist = weapons::Get(weapons::UNARMED);
+				ranged_fixed = bw && fist && bw->damage_type == weapons::DAMAGE_TYPE_STATIC && DistanceToPlayer(playerid, issuerid) > fist->range + 2.0f;
+			}
+
+			if (!ranged_fixed)
+			{
+				FixAnimationBugAmount(amount, weaponid);
 			}
 
 			// Car parking
@@ -210,7 +232,7 @@ namespace wf
 			}
 
 			// Check for pistol whip
-			if ((weaponid >= weapons::COLT45 && weaponid <= weapons::SNIPER) || weaponid == weapons::MINIGUN || weaponid == weapons::SPRAYCAN || weaponid == weapons::FIREEXTINGUISHER)
+			if (!ranged_fixed && ((weaponid >= weapons::COLT45 && weaponid <= weapons::SNIPER) || weaponid == weapons::MINIGUN || weaponid == weapons::SPRAYCAN || weaponid == weapons::FIREEXTINGUISHER))
 			{
 				// A pistol whip inflicts 2.64 damage
 				if (Is(amount, 2.6400001049041748046875f))
@@ -229,7 +251,7 @@ namespace wf
 				return WC_INVALID_DAMAGE;
 			}
 
-			if (weaponid != weapons::PISTOLWHIP)
+			if (weaponid != weapons::PISTOLWHIP && !ranged_fixed)
 			{
 				if (Is(amount, 1.32000005245208740234375f) || Is(amount, 1.650000095367431640625f) || Is(amount, 1.980000019073486328125f) || Is(amount, 2.3100001811981201171875f) || Is(amount, 2.6400001049041748046875f) || Is(amount, 2.9700000286102294921875f) || Is(amount, 3.96000003814697265625f) || Is(amount, 4.28999996185302734375f) || Is(amount, 4.62000036239624023437f) || Is(amount, 5.280000209808349609375f))
 				{
@@ -1428,7 +1450,7 @@ namespace wf
 
 			// Keep the client alive while it plays the stealth kill animation
 			server::SetPlayerHealth(playerid, std::numeric_limits<float>::max());
-			P(playerid).last_sent_health = -1;
+			P(playerid).last_sent_health = -1.0f;
 
 			int anim = server::GetPlayerAnimationIndex(issuerid);
 			int forcesync = anim != 747 ? 1 : 2;

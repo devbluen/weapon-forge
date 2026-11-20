@@ -1,4 +1,4 @@
-// Health bar (the client's real health is kept at 8000000 + x, so a textdraw
+// Health bar (the client's real health is kept at kHealthBase + x, so a textdraw
 // shows the server-side value) and the damage feed.
 #include "core.hpp"
 #include "server.hpp"
@@ -12,7 +12,6 @@ namespace wf
 	namespace
 	{
 		constexpr int kFontSprite = 4;
-		constexpr float kHealthBase = 8000000.0f;
 
 		bool IsSet(float f)
 		{
@@ -161,58 +160,60 @@ namespace wf
 			return;
 		}
 
-		int health = static_cast<int>(std::ceil(p.health / p.max_health * 100.0f));
-		int armour = static_cast<int>(std::ceil(p.armour / p.max_armour * 100.0f));
+		// Sent to the client as floats, decimals included
+		float health = p.health / p.max_health * 100.0f;
+		float armour = p.armour / p.max_armour * 100.0f;
 
 		// Make the values reflect what the client should see
 		if (p.dying)
 		{
-			health = 0;
-			armour = 0;
+			health = 0.0f;
+			armour = 0.0f;
 		}
 		else
 		{
-			if (health > 100)
+			if (health > 100.0f)
 			{
-				health = 100;
+				health = 100.0f;
 			}
-			if (armour > 100)
+			if (armour > 100.0f)
 			{
-				armour = 100;
+				armour = 100.0f;
 			}
 		}
 
-		if (health < 0)
+		if (!(health > 0.0f))
 		{
-			health = 0;
+			health = 0.0f;
 		}
-		if (armour < 0)
+		if (!(armour > 0.0f))
 		{
-			armour = 0;
+			armour = 0.0f;
 		}
 
 		if (force)
 		{
-			p.last_sent_health = -1;
-			p.last_sent_armour = -1;
+			p.last_sent_health = -1.0f;
+			p.last_sent_armour = -1.0f;
 		}
 		else if (p.health_bar_visible && p.hb_foreground == kInvalidTextDraw && !p.dying)
 		{
-			p.last_sent_health = -1;
+			p.last_sent_health = -1.0f;
 		}
 		else if (health == p.last_sent_health && armour == p.last_sent_armour)
 		{
 			return;
 		}
 
-		SetFakeHealth(playerid, health);
-		SetFakeArmour(playerid, armour);
+		// The sync packets carry a byte: rounded up, so a player alive with 0.3 shows 1
+		SetFakeHealth(playerid, static_cast<int>(std::ceil(health)));
+		SetFakeArmour(playerid, static_cast<int>(std::ceil(armour)));
 
 		if (health != p.last_sent_health)
 		{
 			p.last_sent_health = health;
 
-			server::SetPlayerHealth(playerid, kHealthBase + static_cast<float>(health));
+			server::SetPlayerHealth(playerid, kHealthBase + health);
 
 			if (p.health_bar_visible && !p.dying)
 			{
@@ -223,7 +224,7 @@ namespace wf
 				GetHealthBarPadding(playerid, pad);
 				GetHealthBarColor(playerid, border, bg, fg);
 
-				float width = CalculateBar(sx - pad[1] - pad[3], 100.0f, static_cast<float>(health));
+				float width = CalculateBar(sx - pad[1] - pad[3], 100.0f, health);
 				float height = sy - pad[0] - pad[2];
 
 				if (p.hb_foreground == kInvalidTextDraw)
@@ -247,7 +248,7 @@ namespace wf
 		if (armour != p.last_sent_armour)
 		{
 			p.last_sent_armour = armour;
-			server::SetPlayerArmour(playerid, static_cast<float>(armour));
+			server::SetPlayerArmour(playerid, armour);
 		}
 	}
 

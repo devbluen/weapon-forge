@@ -65,7 +65,7 @@ Diferenças em relação ao weapon-config:
 - Cancelar uma **morte real** do cliente (ex.: veículo explodindo com o jogador dentro) em `OnPlayerDamage` esconde a morte dos scripts, mas o cliente ainda passa pelo respawn normal.
 - `OnPlayerGiveDamage`/`OnPlayerTakeDamage` não chegam aos scripts, igual ao weapon-config. Use `WF_SetForwardDamageCallbacks(true)` se precisar deles.
 - No `gmx`, todas as configurações voltam ao padrão (como no weapon-config, onde cada carregamento começa do zero).
-- Armas com `DAMAGE_TYPE_STATIC` não têm o valor de dano do cliente comparado com o `weapon.dat` do GTA (o valor nunca é usado), então clientes com armas modificadas funcionam. Uma espingarda fixa com chumbos fora do padrão conta como um acerto. Os tipos multiplicador continuam com a validação rígida.
+- Armas com `DAMAGE_TYPE_STATIC` não têm o valor de dano do cliente comparado com o `weapon.dat` do GTA (o valor nunca é usado), então clientes com armas modificadas funcionam. Uma espingarda fixa com chumbos fora do padrão conta como um acerto. Fora do alcance de soco, o valor também não é mais tomado por coronhada ou soco (antes um tiro de AK-47 ou sawn-off modificada podia virar um soco "longe demais" e ser descartado). Os tipos multiplicador continuam com a validação rígida.
 - NPCs nativos do open.mp (`NPC_Create`) precisam de `NPC_Respawn` em `OnPlayerDeathFinished`. NPCs do SA-MP são respawnados pelo plugin.
 
 ## Como funciona
@@ -77,7 +77,7 @@ O plugin instala hooks (detours x86) nas funções da máquina virtual Pawn que 
 - **`amx_FindPublic`:** se nenhum script implementa um callback de que o plugin precisa, ele é informado como existente no gamemode, para o servidor sempre gerar o evento.
 - **Rede:** no SA-MP, o plugin envolve o `RakServer::Receive` (obtido pelo `ppData` do servidor). No open.mp (component), usa os eventos de rede do próprio open.mp. Os pacotes onfoot/veículo/passageiro/mira recebem a vida/colete server-side, o congelamento durante a morte e as correções de sync antes do servidor processá-los.
 
-A vida real do cliente fica em `8000000 + vida`, então o cliente nunca morre sozinho. A barra de vida do HUD é desenhada com textdraws, e os outros jogadores veem o valor certo no nametag porque os pacotes de sync carregam a vida server-side.
+A vida real do cliente fica em `30000 + vida` (enviada como float, com as casas decimais), então o cliente nunca morre sozinho. A barra de vida do HUD é desenhada com textdraws, e os outros jogadores veem o valor certo no nametag porque os pacotes de sync carregam a vida server-side.
 
 ## Callbacks
 

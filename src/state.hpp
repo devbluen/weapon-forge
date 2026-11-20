@@ -16,6 +16,12 @@ namespace wf
 	constexpr int kInvalidTextDraw = 0xFFFF;
 	constexpr int kInvalidObject = 0xFFFF;
 	constexpr int kNoTeam = 255;
+
+	// The client's real health is kept at kHealthBase + x, x being the server-side
+	// health in percent, so the client never dies on its own. Below 32768 a float
+	// still keeps x in 1/512 steps (at 8000000 it was 0.5), and no damage the client
+	// takes between two updates comes anywhere near it.
+	constexpr float kHealthBase = 30000.0f;
 	constexpr int kFeedHeight = 5;
 	constexpr int kMaxRejectedHits = 15;
 	constexpr int kPrevHits = 10;
@@ -180,8 +186,9 @@ namespace wf
 		float health = 100.0f;
 		float max_armour = 100.0f;
 		float armour = 0.0f;
-		int last_sent_health = -1;
-		int last_sent_armour = -1;
+		// Last values sent to the client (percent), -1 forces the next update
+		float last_sent_health = -1.0f;
+		float last_sent_armour = -1.0f;
 		float damage_done_health = 0.0f;
 		float damage_done_armour = 0.0f;
 

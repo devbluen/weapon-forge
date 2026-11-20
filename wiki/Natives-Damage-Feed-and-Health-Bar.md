@@ -32,7 +32,7 @@ native WF_SetDamageFeedPosition(Float:given_x, Float:given_y, Float:taken_x, Flo
 
 ## Health bar
 
-The client's real health is kept at 8000000+, so the HUD health bar is replaced by textdraws showing the server-side health. The bar is shown while the player is on foot or in a vehicle.
+The client's real health is kept at 30000+, so the HUD health bar is replaced by textdraws showing the server-side health. The bar is shown while the player is on foot or in a vehicle.
 
 ### WF_EnableHealthBarForPlayer
 *Alias: `EnableHealthBarForPlayer`*

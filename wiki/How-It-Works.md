@@ -45,14 +45,14 @@ The server only raises a callback if a script implements it. When no script has,
 
 weapon-forge reproduces weapon-config's model:
 
-- The client's real health is kept at `8000000 + health`, so the client never dies on its own. Every death is decided by the server.
+- The client's real health is kept at `30000 + health` (health in percent, sent as a float with its decimals), so the client never dies on its own. Every death is decided by the server.
 - The plugin stores the real health and armour. `GetPlayerHealth` returns that value in every script.
 - The health bar on the HUD is a textdraw drawn by the plugin.
 - When health reaches 0, the plugin plays a death animation chosen from the weapon and situation. It then calls `OnPlayerDeath` in every script and, after `SetRespawnTime` milliseconds, calls `OnPlayerDeathFinished` and respawns the player.
 
 ## Sync packets
 
-Other players see a player's health in the nametag from the sync packets that player sends. Those packets carry the real client health (8000000+), so the plugin rewrites them with the server-side value before the server reads them.
+Other players see a player's health in the nametag from the sync packets that player sends. Those packets carry the real client health (30000+), so the plugin rewrites them with the server-side value before the server reads them.
 
 - **SA-MP:** the plugin gets the server's `RakServer` (through the plugin data the server hands to plugins) and wraps its `Receive` method.
 - **open.mp:** the component registers a network event handler.

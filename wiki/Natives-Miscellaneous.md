@@ -30,7 +30,7 @@ native bool:WF_IsRakNetActive();
 native Float:WF_GetPlayerRawHealth(playerid, &Float:health = 0.0);
 ```
 
-The health stored by the server itself, as opposed to the server-side health `GetPlayerHealth` returns. With sync packet processing this is the value other players see in the nametag. Without it, it's the client's 8000000+ value. Mostly useful for debugging.
+The health stored by the server itself, as opposed to the server-side health `GetPlayerHealth` returns. With sync packet processing this is the value other players see in the nametag. Without it, it's the client's 30000+ value. Mostly useful for debugging.
 
 ## WF_GetVersion
 

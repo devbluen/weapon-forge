@@ -13,7 +13,6 @@ namespace wf
 {
 	namespace
 	{
-		constexpr float kHealthBase = 8000000.0f;
 		uint32_t g_last_periodic = 0;
 
 		float AngleBetweenPoints(float x1, float y1, float x2, float y2)
@@ -21,7 +20,7 @@ namespace wf
 			return -(90.0f - std::atan2(y1 - y2, x1 - x2) * 180.0f / 3.14159265358979323846f);
 		}
 
-		// Real health is kept at 8000000 + x while the plugin is active
+		// Real health is kept at kHealthBase + x while the plugin is active
 		float ReadRealHealth(int playerid)
 		{
 			float health = server::GetPlayerHealth(playerid);
@@ -206,8 +205,8 @@ namespace wf
 			FreezeSyncPacket(i, false);
 			SetFakeFacingAngle(i);
 			DestroyHud(i);
-			p.last_sent_health = -1;
-			p.last_sent_armour = -1;
+			p.last_sent_health = -1.0f;
+			p.last_sent_armour = -1.0f;
 
 			// Every player goes back to class selection
 			ClearDying(i);

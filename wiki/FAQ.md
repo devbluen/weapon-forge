@@ -16,9 +16,9 @@ It works, but open.mp gives legacy plugins no network access. The nametag health
 
 Windows uses DLLs (PE format) and Linux uses shared objects (ELF format), so no single file can be both. weapon-forge has one binary per OS, and each one works on both SA-MP and open.mp.
 
-### `GetPlayerHealth` returns 8000000 in another plugin / external tool
+### `GetPlayerHealth` returns 30000 in another plugin / external tool
 
-Scripts get the server-side health because the plugin replaces the native. Other plugins that read the server's internal health directly see what the server stores. With sync packet processing that is the value the client reports, otherwise the 8000000+ value. `WF_GetPlayerRawHealth` shows it.
+Scripts get the server-side health because the plugin replaces the native. Other plugins that read the server's internal health directly see what the server stores. With sync packet processing that is the value the client reports, otherwise the 30000+ value. `WF_GetPlayerRawHealth` shows it.
 
 ### Players show full health in the nametag
 

@@ -336,7 +336,7 @@ native WF_SetDebug(level);
 native bool:WF_IsOpenMP();
 // Whether incoming sync packets are processed (nametag health, sync fixes)
 native bool:WF_IsRakNetActive();
-// Health stored by the server itself (8000000 + x, or the synced value when packets are processed)
+// Health stored by the server itself (30000 + x, or the synced value when packets are processed)
 native Float:WF_GetPlayerRawHealth(playerid, &Float:health = 0.0);
 native WF_GetVersion(version[] = "", len = sizeof(version));
 
